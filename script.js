@@ -419,7 +419,8 @@ class Metronome {
             bpm: this.bpm,
             beatsPerMeasure: this.beatsPerMeasure,
             soundType: this.soundType,
-            volume: this.volume
+            volume: this.volume,
+            timerMinutes: this.timerMinutes // 保存计时器分钟数
         };
         
         // 获取现有预设
@@ -431,6 +432,17 @@ class Metronome {
         this.loadPresets();
     }
     
+    // 删除预设
+    deletePreset(index) {
+        const presets = JSON.parse(localStorage.getItem('metronomePresets') || '[]');
+        // 移除指定索引的预设
+        presets.splice(index, 1);
+        // 保存更新后的预设列表
+        localStorage.setItem('metronomePresets', JSON.stringify(presets));
+        // 重新加载预设列表
+        this.loadPresets();
+    }
+    
     // 加载预设列表
     loadPresets() {
         const presets = JSON.parse(localStorage.getItem('metronomePresets') || '[]');
@@ -438,15 +450,31 @@ class Metronome {
         
         presets.forEach((preset, index) => {
             const button = document.createElement('button');
-            button.className = 'preset-button py-2 px-3 rounded-lg bg-gray-100 text-gray-600 font-medium text-sm flex justify-between items-center';
+            button.className = 'preset-button py-2 px-3 rounded-lg bg-gray-100 text-gray-600 font-medium text-sm flex justify-between items-center w-full hover:bg-gray-200 transition-colors';
             button.innerHTML = `
                 <span>${preset.name}</span>
-                <span class="text-xs">${preset.bpm} BPM</span>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs">${preset.bpm} BPM</span>
+                    <span class="delete-icon text-gray-500 hover:text-red-500 cursor-pointer text-xs" style="font-size: 0.7em">🗑️</span>
+                </div>
             `;
             
-            // 应用预设
-            button.addEventListener('click', () => {
-                this.applyPreset(preset);
+            // 应用预设（点击按钮主体部分）
+            button.addEventListener('click', (e) => {
+                // 如果点击的是删除图标，不应用预设
+                if (!e.target.closest('.delete-icon')) {
+                    this.applyPreset(preset);
+                }
+            });
+            
+            // 删除预设（点击删除图标）
+            const deleteIcon = button.querySelector('.delete-icon');
+            deleteIcon.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
+                // 显示确认对话框
+                if (confirm(`确定要删除预设 "${preset.name}" 吗？`)) {
+                    this.deletePreset(index);
+                }
             });
             
             this.presetList.appendChild(button);
@@ -459,6 +487,19 @@ class Metronome {
         this.beatsPerMeasure = preset.beatsPerMeasure;
         this.soundType = preset.soundType;
         this.volume = preset.volume;
+        
+        // 应用计时器设置（如果预设中包含）
+        if (preset.timerMinutes !== undefined) {
+            this.timerMinutes = preset.timerMinutes;
+            if (this.timerMinutesSlider) {
+                this.timerMinutesSlider.value = this.timerMinutes;
+            }
+            // 如果计时器未运行，更新剩余时间
+            if (!this.timerIsRunning) {
+                this.timerRemainingSeconds = this.timerMinutes * 60;
+                this.updateTimerDisplay();
+            }
+        }
         
         // 更新UI
         this.bpmSlider.value = this.bpm;
